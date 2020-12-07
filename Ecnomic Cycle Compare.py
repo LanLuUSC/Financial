@@ -72,7 +72,7 @@ def CalOutputGap(gdp, gdpRowName, potentialGdp, potentialGdpRowName):
     result.reset_index(inplace=True)
     result.set_index('Date', inplace=True)
     return result
-def CalGrowthPeriod(data, dataName, threshold) :
+def CalGrowthPeriod(data, dataName, trendGapBiggerThan, growthShouldHaveNumberBiggerThan, decreaseShouldHaveNumberSmallerThan) :
     dataCount = len(data.index)
     if (dataCount < 2) :
         return
@@ -85,12 +85,12 @@ def CalGrowthPeriod(data, dataName, threshold) :
     periodStartIndex = 0
     
     result = []
-    THRESHOLD = threshold
+    TRENDGAPBIGGERTHAN = trendGapBiggerThan
     for n in range(1, dataCount):
         curValue = data[dataName][n]
         diff = curValue - data[dataName][localPeakIndex]
         #direction has changed
-        if abs(diff) > THRESHOLD and diff * curTrend <= 0:
+        if ((diff > TRENDGAPBIGGERTHAN and curValue > growthShouldHaveNumberBiggerThan) or (diff * -1 > TRENDGAPBIGGERTHAN and curValue < decreaseShouldHaveNumberSmallerThan)) and diff * curTrend <= 0:
             # if is not start index
             if (curTrend != UNJUDGED) :
                 result.append((data.index[periodStartIndex], curTrend))
@@ -139,7 +139,6 @@ def CalPhases(gdpPeriod, inflationPeriod) :
             j += 1
 
     return phases
-
 def PlotBackgroundRegion(ax, peroidTupleArray, colors, labels):
     printedLabels = set()
     for n in range(1, len(peroidTupleArray)):
@@ -148,25 +147,28 @@ def PlotBackgroundRegion(ax, peroidTupleArray, colors, labels):
         printedLabels.add(label)
     ax.axvspan(peroidTupleArray[-1][0], datetime.datetime.now(), facecolor = colors[peroidTupleArray[-1][1]], alpha = 0.5)
 
-startTime = datetime.datetime(1985, 1, 1)
+startTime = datetime.datetime(2000, 1, 1)
 endTime = datetime.datetime.now()
 # gdp = GetData("GDP", "fred", "DATE", startTime, endTime)
 # gdpIncrePercentage = CalGdpIncreasePercentage(gdp)
+# gdpPeriod = CalGrowthPeriod(gdpIncrePercentage, 'Percentage', 1, 0.0, 10.0)
 # gdpIncreGoldenRule = GetData('CPGDPAI', 'fred', 'DATE', startTime, endTime)
 rawGDP = GetData('GDPC1', 'fred', 'DATE', startTime, endTime)
 rawPotentialGDP = GetData('GDPPOT', 'fred', 'DATE', startTime, endTime)
 outputGap = CalOutputGap(rawGDP, 'GDPC1', rawPotentialGDP, 'GDPPOT')
-gdpPeriod = CalGrowthPeriod(outputGap, 'OutputGap', 2)
+gdpPeriod = CalGrowthPeriod(outputGap, 'OutputGap', 2, 0.0, 0.0)
 # inflation = GetData('FPCPITOTLZGUSA', 'fred', 'DATE', startTime, endTime)
 # inflationPeriod = CalGrowthPeriod(inflation, 'FPCPITOTLZGUSA', 0.5)
-cpi = GetData('CUUS0000SA0', 'fred', 'DATE', startTime, endTime)
-cpiIncPer = CalSamePeriodLastYearIncreaseRatio(cpi, 'CUUS0000SA0')
-inflationPeriod = CalGrowthPeriod(cpiIncPer, 'Percentage', 0.5)
+# cpi = GetData('CUUS0000SA0', 'fred', 'DATE', startTime, endTime)
+# cpiIncPer = CalSamePeriodLastYearIncreaseRatio(cpi, 'CUUS0000SA0')
+pce = GetData('PCEPI', 'fred', 'DATE', startTime, endTime)
+pceIncPer = CalSamePeriodLastYearIncreaseRatio(pce, 'PCEPI')
+inflationPeriod = CalGrowthPeriod(pceIncPer, 'Percentage', 1.5, 2.5, 1.5)
 economicPhases = CalPhases(gdpPeriod, inflationPeriod)
 
 # print(outputGap.head())
-# sp500 = GetData("%5EGSPC", "yahoo", "Date", startTime, endTime)
-# sp500Per = CalSamePeriodLastYearIncreaseRatio(sp500, 'Close')
+sp500 = GetData("%5EGSPC", "yahoo", "Date", startTime, endTime)
+sp500Per = CalSamePeriodLastYearIncreaseRatio(sp500, 'Close')
 # oil = GetData('DCOILWTICO', 'fred', 'DATE', startTime, endTime)
 # oilPer = CalSamePeriodLastYearIncreaseRatio(oil, 'DCOILWTICO')
 #df['100ma'] = df['Adj Close'].rolling(window=100, min_periods=0).mean()
@@ -182,15 +184,15 @@ PlotBackgroundRegion(ax1,economicPhases,['b', 'g', 'r', 'y', 'm', 'c'],['1 REFLA
 ax1.legend()
 
 ax2 = plot.subplot2grid((7,1), (3,0), rowspan=2, colspan=1, sharex = ax1)
-ax2.plot(cpiIncPer.index, cpiIncPer['Percentage'])
+ax2.plot(pceIncPer.index, pceIncPer['Percentage'])
 # ax1.plot(inflation.index, inflation['FPCPITOTLZGUSA'])
-ax2.legend(['CPI'])
+ax2.legend(['PCE'])
 PlotBackgroundRegion(ax2, inflationPeriod, ['b', 'g', 'r'], ['','UP', 'DOWN'])
 
 ax3 = plot.subplot2grid((7,1), (5,0), rowspan=2, colspan=1, sharex = ax1)
 ax3.plot(outputGap.index, outputGap['OutputGap'])
 # ax1.plot(inflation.index, inflation['FPCPITOTLZGUSA'])
-ax3.legend(['OutputGap'])
+ax3.legend(['GDP'])
 PlotBackgroundRegion(ax3, gdpPeriod, ['b', 'g', 'r'], ['','UP', 'DOWN'])
 
 # ax2 = plot.subplot2grid((7,1), (6,0), rowspan=1, colspan=1, sharex = ax1)

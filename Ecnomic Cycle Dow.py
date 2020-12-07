@@ -8,7 +8,7 @@ import os.path
 
 def GetData(dataName, dataSource, indexName, startTime, endTime):
     dataFileName = dataName + ".csv"
-    # if not os.path.exists(dataFileName):
+
     rawData = web.DataReader(dataName, dataSource, startTime, endTime)
     # print(rawData.head())
     rawData.reset_index(inplace=True)
@@ -189,8 +189,15 @@ def CalGainEachPeriod(totalPhases, economicPhases, economicData, dataName) :
         n +=1
     return result
 def RevertBondGain(bondAnnulizedReturns):
+    returnGain = []
     for bondAnnulizedReturn in bondAnnulizedReturns:
-        bondAnnulizedReturn[-1] *= -1
+        returnGain.append((bondAnnulizedReturn[0], bondAnnulizedReturn[1], bondAnnulizedReturn[2] * -1))
+    return returnGain
+def RevertBondGainPeriod(bondAnnulizedReturns):
+    returnGain = []
+    for bondAnnulizedReturn in bondAnnulizedReturns:
+        returnGain.append((bondAnnulizedReturn[0], bondAnnulizedReturn[1] * -1))
+    return returnGain
 
 startTime = datetime.datetime(2000, 1, 1)
 endTime = datetime.datetime.now()
@@ -208,9 +215,11 @@ gdpPeriod = CalGrowthPeriod(outputGap, 'OutputGap', 2, 0.0, 0.0)
 # inflationPeriod = CalInflationPeriod(cpiIncPer, 'Percentage', 1)
 pce = GetData('PCEPI', 'fred', 'DATE', startTime, endTime)
 pceIncPer = CalSamePeriodLastYearIncreaseRatio(pce, 'PCEPI')
-inflationPeriod = CalGrowthPeriod(pceIncPer, 'Percentage', 2, 2.5, 1.0)
+inflationPeriod = CalGrowthPeriod(pceIncPer, 'Percentage', 1.5, 2.5, 1.5)
 # del inflationPeriod[-1]
 # del inflationPeriod[-1]
+# gdpPeriod = [(datetime.datetime(1985,1,1), -1), (datetime.datetime(1991,11,1), 1), (datetime.datetime(2000,1,1), -1), (datetime.datetime(2002,11,1), 1), (datetime.datetime(2007,11,1), -1), (datetime.datetime(2009,1,1), 1), (datetime.datetime(2019,11,1), -1)]
+# inflationPeriod = [(datetime.datetime(1985,1,1), -1), (datetime.datetime(1997,6,1), 1), (datetime.datetime(2000,6,1), -1), (datetime.datetime(2001,1,1), 1), (datetime.datetime(2007,6,1), -1), (datetime.datetime(2008,6,1), 1), (datetime.datetime(2010,8,1), -1)]
 economicPhases = CalPhases(gdpPeriod, inflationPeriod)
 
 # print(outputGap.head()) 
@@ -236,12 +245,14 @@ copperAnnulizedReturns = CalPeriodGain(economicPhases, copper, 'PCOPPUSDM')
 copperGainEachPeriod = CalGainEachPeriod(4, economicPhases, copper, 'PCOPPUSDM')
 oneyearBond = GetData('DGS1', 'fred', 'DATE', startTime, endTime)
 oneyearBondAnnulizedReturns = CalPeriodGain(economicPhases, oneyearBond, 'DGS1')
-# RevertBondGain(oneyearBondAnnulizedReturns)
+oneyearBondAnnulizedReturns = RevertBondGain(oneyearBondAnnulizedReturns)
 oneyearBondGainEachPeriod = CalGainEachPeriod(4, economicPhases, oneyearBond, 'DGS1')
-# RevertBondGain(oneyearBondGainEachPeriod)
+oneyearBondGainEachPeriod = RevertBondGainPeriod(oneyearBondGainEachPeriod)
 tenyearBond = GetData('DGS10', 'fred', 'DATE', startTime, endTime)
 tenyearBondAnnulizedReturns = CalPeriodGain(economicPhases, tenyearBond, 'DGS10')
+tenyearBondAnnulizedReturns = RevertBondGain(tenyearBondAnnulizedReturns)
 tenyearBondGainEachPeriod = CalGainEachPeriod(4, economicPhases, tenyearBond, 'DGS10')
+tenyearBondGainEachPeriod = RevertBondGainPeriod(tenyearBondGainEachPeriod)
 # oilPer = CalSamePeriodLastYearIncreaseRatio(oil, 'DCOILWTICO')
 #df['100ma'] = df['Adj Close'].rolling(window=100, min_periods=0).mean()
 # print(sp500.head())
@@ -252,25 +263,30 @@ style.use('ggplot')
 
 ax1 = plot.subplot2grid((20,1), (0,0), rowspan=5, colspan=1)
 # ax1.bar(outputGap.index, outputGap['Percentage'], width = 100)
-# ax1.plot(sp500.index, sp500['Close'])
+ax1_1 = ax1.twinx()
+ax1_1.plot(sp500.index, sp500['Close'])
 # ax1.legend(['Sp500'])
 # ax1.legend(['OutputGap'])
 # PlotBackgroundRegion(ax1,economicPhases,['b', 'g', 'r', 'y', 'm', 'c'],['1 REFLATION','2 RECOVERY','3 OVERHEAT','4 STAGFLATION'])
 PlotGainAsBarWithPhasesAsBackGround(ax1,periodAnnulizedReturns,['b', 'g', 'r', 'y', 'm', 'c'],['1 REFLATION','2 RECOVERY','3 OVERHEAT','4 STAGFLATION'])
 ax1.legend()
-
-ax2 = plot.subplot2grid((20,1), (5,0), rowspan=5, colspan=1)
+ax2 = plot.subplot2grid((20,1), (5,0), rowspan=5, colspan=1, sharex = ax1)
 PlotGainAsBarWithPhasesAsBackGround(ax2,copperAnnulizedReturns,['b', 'g', 'r', 'y', 'm', 'c'],['1 REFLATION','2 RECOVERY','3 OVERHEAT','4 STAGFLATION'])
 ax2.legend()
-
-ax3 = plot.subplot2grid((20,1), (10,0), rowspan=5, colspan=1)
+ax2_1 = ax2.twinx()
+ax2_1.plot(copper.index, copper['PCOPPUSDM'])
+ax3 = plot.subplot2grid((20,1), (10,0), rowspan=5, colspan=1, sharex = ax1)
 PlotGainAsBarWithPhasesAsBackGround(ax3,ironAnnulizedReturns,['b', 'g', 'r', 'y', 'm', 'c'],['1 REFLATION','2 RECOVERY','3 OVERHEAT','4 STAGFLATION'])
 ax3.legend()
+ax3_1 = ax3.twinx()
+ax3_1.plot(iron.index, iron['PIORECRUSDM'])
 
-
-ax4 = plot.subplot2grid((20,1), (15,0), rowspan=5, colspan=1)
+ax4 = plot.subplot2grid((20,1), (15,0), rowspan=5, colspan=1, sharex = ax1)
 PlotGainAsBarWithPhasesAsBackGround(ax4,tenyearBondAnnulizedReturns,['b', 'g', 'r', 'y', 'm', 'c'],['1 REFLATION','2 RECOVERY','3 OVERHEAT','4 STAGFLATION'])
 ax4.legend()
+ax4_1 = ax4.twinx()
+ax4_1.plot(tenyearBond.index, tenyearBond['DGS10'])
+
 # ax2 = plot.subplot2grid((7,1), (3,0), rowspan=2, colspan=1, sharex = ax1)
 # ax2.plot(sp500Per.index, sp500Per['Percentage'])
 # ax2.legend(['Sp500'])
