@@ -147,7 +147,7 @@ def PlotBackgroundRegion(ax, peroidTupleArray, colors, labels):
         printedLabels.add(label)
     ax.axvspan(peroidTupleArray[-1][0], datetime.datetime.now(), facecolor = colors[peroidTupleArray[-1][1]], alpha = 0.5)
 
-startTime = datetime.datetime(2000, 1, 1)
+startTime = datetime.datetime(1985, 1, 1)
 endTime = datetime.datetime.now()
 # gdp = GetData("GDP", "fred", "DATE", startTime, endTime)
 # gdpIncrePercentage = CalGdpIncreasePercentage(gdp)
@@ -163,7 +163,9 @@ gdpPeriod = CalGrowthPeriod(outputGap, 'OutputGap', 2, 0.0, 0.0)
 # cpiIncPer = CalSamePeriodLastYearIncreaseRatio(cpi, 'CUUS0000SA0')
 pce = GetData('PCEPI', 'fred', 'DATE', startTime, endTime)
 pceIncPer = CalSamePeriodLastYearIncreaseRatio(pce, 'PCEPI')
-inflationPeriod = CalGrowthPeriod(pceIncPer, 'Percentage', 1.5, 2.5, 1.5)
+inflationPeriod = CalGrowthPeriod(pceIncPer, 'Percentage', 2, 2.5, 1.0)
+gdpPeriod = [(datetime.datetime(1985,1,1), -1), (datetime.datetime(1991,11,1), 1), (datetime.datetime(2000,1,1), -1), (datetime.datetime(2002,11,1), 1), (datetime.datetime(2007,11,1), -1), (datetime.datetime(2009,1,1), 1), (datetime.datetime(2019,11,1), -1)]
+inflationPeriod = [(datetime.datetime(1985,1,1), -1), (datetime.datetime(1997,6,1), 1), (datetime.datetime(2000,6,1), -1), (datetime.datetime(2001,1,1), 1), (datetime.datetime(2007,6,1), -1), (datetime.datetime(2008,6,1), 1), (datetime.datetime(2010,8,1), -1)]
 economicPhases = CalPhases(gdpPeriod, inflationPeriod)
 
 # print(outputGap.head())

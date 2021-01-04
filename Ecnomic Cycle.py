@@ -6,6 +6,7 @@ import pandas_datareader.data as web
 import numpy as np
 import os.path
 
+
 def GetData(dataName, dataSource, indexName, startTime, endTime):
     dataFileName = dataName + ".csv"
     # if not os.path.exists(dataFileName):
@@ -48,7 +49,7 @@ def CalSamePeriodLastYearIncreaseRatio(data, dataName):
         dayDiff = (data.index[n] - data.index[index]).days
         if dayDiff >= 365 and dayDiff <= 455:
             timeSeries.append(data.index[index])
-            percentage.append(100 * (data[dataName][n] - data[dataName][index])/data[dataName][index])
+            percentage.append(100 * (data[dataName][n] - data[dataName][index])/data[dataName][n])
         while index <= n:
             if (data.index[n] - data.index[index]).days >= 365:
                 index += 1
@@ -72,7 +73,7 @@ def CalOutputGap(gdp, gdpRowName, potentialGdp, potentialGdpRowName):
     result.reset_index(inplace=True)
     result.set_index('Date', inplace=True)
     return result
-def CalGrowthPeriod(data, dataName, trendGapBiggerThan, growthShouldHaveNumberBiggerThan, decreaseShouldHaveNumberSmallerThan) :
+def CalGrowthPeriod(data, dataName, threshold) :
     dataCount = len(data.index)
     if (dataCount < 2) :
         return
@@ -85,12 +86,12 @@ def CalGrowthPeriod(data, dataName, trendGapBiggerThan, growthShouldHaveNumberBi
     periodStartIndex = 0
     
     result = []
-    TRENDGAPBIGGERTHAN = trendGapBiggerThan
+    THRESHOLD = threshold
     for n in range(1, dataCount):
         curValue = data[dataName][n]
         diff = curValue - data[dataName][localPeakIndex]
         #direction has changed
-        if ((diff > TRENDGAPBIGGERTHAN and curValue > growthShouldHaveNumberBiggerThan) or (diff * -1 > TRENDGAPBIGGERTHAN and curValue < decreaseShouldHaveNumberSmallerThan)) and diff * curTrend <= 0:
+        if abs(diff) > THRESHOLD and diff * curTrend <= 0:
             # if is not start index
             if (curTrend != UNJUDGED) :
                 result.append((data.index[periodStartIndex], curTrend))
@@ -147,28 +148,26 @@ def PlotBackgroundRegion(ax, peroidTupleArray, colors, labels):
         printedLabels.add(label)
     ax.axvspan(peroidTupleArray[-1][0], datetime.datetime.now(), facecolor = colors[peroidTupleArray[-1][1]], alpha = 0.5)
 
-startTime = datetime.datetime(2000, 1, 1)
+startTime = datetime.datetime(1985, 1, 1)
 endTime = datetime.datetime.now()
-# gdp = GetData("GDP", "fred", "DATE", startTime, endTime)
-# gdpIncrePercentage = CalGdpIncreasePercentage(gdp)
-# gdpPeriod = CalGrowthPeriod(gdpIncrePercentage, 'Percentage', 1, 0.0, 10.0)
+gdp = GetData("GDP", "fred", "DATE", startTime, endTime)
+gdpIncrePercentage = CalGdpIncreasePercentage(gdp)
+gdpPeriod = CalGrowthPeriod(gdpIncrePercentage, 'Percentage', 0.5)
 # gdpIncreGoldenRule = GetData('CPGDPAI', 'fred', 'DATE', startTime, endTime)
-rawGDP = GetData('GDPC1', 'fred', 'DATE', startTime, endTime)
-rawPotentialGDP = GetData('GDPPOT', 'fred', 'DATE', startTime, endTime)
-outputGap = CalOutputGap(rawGDP, 'GDPC1', rawPotentialGDP, 'GDPPOT')
-gdpPeriod = CalGrowthPeriod(outputGap, 'OutputGap', 2, 0.0, 0.0)
+# rawGDP = GetData('GDPC1', 'fred', 'DATE', startTime, endTime)
+# rawPotentialGDP = GetData('GDPPOT', 'fred', 'DATE', startTime, endTime)
+# outputGap = CalOutputGap(rawGDP, 'GDPC1', rawPotentialGDP, 'GDPPOT')
+# gdpPeriod = CalGrowthPeriod(outputGap, 'OutputGap', 2)
 # inflation = GetData('FPCPITOTLZGUSA', 'fred', 'DATE', startTime, endTime)
 # inflationPeriod = CalGrowthPeriod(inflation, 'FPCPITOTLZGUSA', 0.5)
-# cpi = GetData('CUUS0000SA0', 'fred', 'DATE', startTime, endTime)
-# cpiIncPer = CalSamePeriodLastYearIncreaseRatio(cpi, 'CUUS0000SA0')
-pce = GetData('PCEPI', 'fred', 'DATE', startTime, endTime)
-pceIncPer = CalSamePeriodLastYearIncreaseRatio(pce, 'PCEPI')
-inflationPeriod = CalGrowthPeriod(pceIncPer, 'Percentage', 1.5, 2.5, 1.5)
+cpi = GetData('CUUS0000SA0', 'fred', 'DATE', startTime, endTime)
+cpiIncPer = CalSamePeriodLastYearIncreaseRatio(cpi, 'CUUS0000SA0')
+inflationPeriod = CalGrowthPeriod(cpiIncPer, 'Percentage', 1.5)
 economicPhases = CalPhases(gdpPeriod, inflationPeriod)
-
+iron = GetData('PIORECRUSDM', 'fred', 'DATE', startTime, endTime)
 # print(outputGap.head())
-sp500 = GetData("%5EGSPC", "yahoo", "Date", startTime, endTime)
-sp500Per = CalSamePeriodLastYearIncreaseRatio(sp500, 'Close')
+# sp500 = GetData("%5EGSPC", "yahoo", "Date", startTime, endTime)
+# sp500Per = CalSamePeriodLastYearIncreaseRatio(sp500, 'Close')
 # oil = GetData('DCOILWTICO', 'fred', 'DATE', startTime, endTime)
 # oilPer = CalSamePeriodLastYearIncreaseRatio(oil, 'DCOILWTICO')
 #df['100ma'] = df['Adj Close'].rolling(window=100, min_periods=0).mean()
@@ -178,19 +177,20 @@ sp500Per = CalSamePeriodLastYearIncreaseRatio(sp500, 'Close')
 style.use('ggplot')
 ax1 = plot.subplot2grid((7,1), (0,0), rowspan=3, colspan=1)
 # ax1.bar(outputGap.index, outputGap['Percentage'], width = 100)
-ax1.plot(outputGap.index, outputGap['OutputGap'])
+ax1.plot(iron.index, iron['PIORECRUSDM'])
 # ax1.legend(['OutputGap'])
 PlotBackgroundRegion(ax1,economicPhases,['b', 'g', 'r', 'y', 'm', 'c'],['1 REFLATION','2 RECOVERY','3 OVERHEAT','4 STAGFLATION'])
 ax1.legend()
 
 ax2 = plot.subplot2grid((7,1), (3,0), rowspan=2, colspan=1, sharex = ax1)
-ax2.plot(pceIncPer.index, pceIncPer['Percentage'])
+ax2.plot(cpiIncPer.index, cpiIncPer['Percentage'])
 # ax1.plot(inflation.index, inflation['FPCPITOTLZGUSA'])
-ax2.legend(['PCE'])
+ax2.legend(['CPI'])
 PlotBackgroundRegion(ax2, inflationPeriod, ['b', 'g', 'r'], ['','UP', 'DOWN'])
 
 ax3 = plot.subplot2grid((7,1), (5,0), rowspan=2, colspan=1, sharex = ax1)
-ax3.plot(outputGap.index, outputGap['OutputGap'])
+# ax3.plot(outputGap.index, outputGap['OutputGap'])
+ax3.plot(gdp.index, gdp['GDP'])
 # ax1.plot(inflation.index, inflation['FPCPITOTLZGUSA'])
 ax3.legend(['GDP'])
 PlotBackgroundRegion(ax3, gdpPeriod, ['b', 'g', 'r'], ['','UP', 'DOWN'])
